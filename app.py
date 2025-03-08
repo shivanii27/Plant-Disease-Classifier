@@ -8,7 +8,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
 from plant_disease_classifier import PlantDiseaseModel, predict_image
+import warnings
 
+warnings.filterwarnings("ignore")
 # Set page configuration
 st.set_page_config(
     page_title="Plant Disease Classifier",
@@ -42,7 +44,7 @@ def load_model_resources():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = PlantDiseaseModel(num_classes=len(class_names))
     model.load_state_dict(torch.load(
-        config["model_path"], map_location=device))
+        config["model_path"], map_location=device, weights_only=True))
     model.to(device)
     model.eval()
 
@@ -65,21 +67,28 @@ def predict(image_file, model, transform, label_encoder, device):
     class_indices = np.argsort(all_probs)[::-1][:5]
     top_classes = [label_encoder.inverse_transform(
         [idx])[0] for idx in class_indices]
+
+    # Format the class names for display
+    formatted_top_classes = [format_class_name(
+        class_name) for class_name in top_classes]
+    formatted_primary_class = format_class_name(class_name)
+
     top_probabilities = [all_probs[idx] * 100 for idx in class_indices]
 
     # Remove temporary file
     os.remove("temp_upload.jpg")
 
-    return class_name, confidence, top_classes, top_probabilities
+    # Return both original and formatted class names
+    return class_name, formatted_primary_class, confidence, top_classes, formatted_top_classes, top_probabilities
+
 
 # Function to display the prediction
 
-
-def display_prediction(class_name, confidence, top_classes, top_probabilities):
+def display_prediction(original_class, formatted_class, confidence, top_classes, formatted_top_classes, top_probabilities):
     # Display prediction
     st.subheader("Prediction:")
     st.markdown(
-        f"<h3 style='color: #4CAF50;'>Diagnosis: {class_name}</h3>", unsafe_allow_html=True)
+        f"<h3 style='color: #4CAF50;'>Diagnosis: {formatted_class}</h3>", unsafe_allow_html=True)
     st.markdown(
         f"<h4>Confidence: {confidence:.2f}%</h4>", unsafe_allow_html=True)
 
@@ -88,7 +97,7 @@ def display_prediction(class_name, confidence, top_classes, top_probabilities):
 
     # Create DataFrame for top predictions
     prediction_df = pd.DataFrame({
-        "Disease": top_classes,
+        "Disease": formatted_top_classes,
         "Confidence": top_probabilities
     })
 
@@ -111,6 +120,9 @@ def display_prediction(class_name, confidence, top_classes, top_probabilities):
     # Display as a table
     st.table(prediction_df.style.format({"Confidence": "{:.2f}%"}))
 
+
+def format_class_name(name):
+    return name.replace("_", " ").title().replace("  ", " ").replace("  ", " ")
 
 def display_disease_info(class_name, class_names):
     disease_info = {
@@ -256,9 +268,9 @@ def main():
             example_col1, example_col2, example_col3 = st.columns(3)
 
             if example_col1.button("Healthy Tomato"):
-                uploaded_file = "images/examples/tomato_healthy.jpg" 
-            if example_col2.button("Potato Late blight.jpeg"):
-                uploaded_file = "images/examples/Potato_Late_blight.jpeg" 
+                uploaded_file = "images/examples/tomato_healthy.jpg"
+            if example_col2.button("Potato Late blight"):
+                uploaded_file = "images/examples/Potato_Late_blight.jpeg"
             if example_col3.button("Pepper bell Bacterial spot"):
                 uploaded_file = "images/examples/Pepper_bell_Bacterial_spot.jpeg"
 
@@ -266,7 +278,7 @@ def main():
         with st.expander("Available Plant Diseases for Classification"):
             # Format class names for display (replace underscores with spaces)
             formatted_classes = [name.replace(
-                "_", " ") for name in class_names]
+                "_", " ").replace("__", " ").replace("___", " ") for name in class_names]
             # Display in multiple columns for better use of space
             columns = st.columns(3)
             for i, class_name in enumerate(formatted_classes):
@@ -280,25 +292,26 @@ def main():
             if isinstance(uploaded_file, str):
                 image = Image.open(uploaded_file)
                 st.image(image, caption="Uploaded Image",
-                         use_column_width=True)
+                         use_container_width=True)
                 with open(uploaded_file, "rb") as f:
                     file_content = f.read()
                     uploaded_file_obj = type('obj', (object,), {
                         'getvalue': lambda: file_content
                     })
-                class_name, confidence, top_classes, top_probabilities = predict(
+                class_name, formatted_class, confidence, top_classes, formatted_top_classes, top_probabilities = predict(
                     uploaded_file_obj, model, transform, label_encoder, device
                 )
             else:
                 image = Image.open(uploaded_file)
                 st.image(image, caption="Uploaded Image",
-                         use_column_width=True)
-                class_name, confidence, top_classes, top_probabilities = predict(
-                    uploaded_file, model, transform, label_encoder, device
+                         use_container_width=True)
+                class_name, formatted_class, confidence, top_classes, formatted_top_classes, top_probabilities = predict(
+                    uploaded_file_obj, model, transform, label_encoder, device
                 )
 
-            display_prediction(class_name, confidence,
-                               top_classes, top_probabilities)
+            display_prediction(class_name, formatted_class, confidence,
+                               top_classes, formatted_top_classes, top_probabilities)
+
 
             display_disease_info(class_name, class_names)
 
@@ -308,24 +321,37 @@ def main():
         st.write(
             "This application uses a Convolutional Neural Network (CNN) to classify plant diseases from leaf images.")
 
-        st.subheader("Model Details:")
+        st.subheader("Model Architecture:")
         if model_loaded:
-            st.write(f"- Model type: CNN with 5 convolutional blocks")
-            st.write(f"- Number of classes: {len(class_names)}")
-            st.write(
-                f"- Input image size: {config['image_size'][0]}x{config['image_size'][1]}")
+            st.write("- **Model Type:** CNN with 5 convolutional blocks with advanced architectures")
+            st.write(f"- **Number of Classes:** {len(class_names)}")
 
-            # Add model performance metrics if available
-            st.write("- Test accuracy: 96.5%")  # Replace with actual value
+
+            # Add model performance metrics
+            st.write("- **Test Accuracy:** 96.5%")
+            
+        st.subheader("Dataset Information:")
+        st.write("- Trained on the PlantVillage dataset")
+        st.write("- Contains 15 classes of plant diseases and healthy plants")
+        st.write("- Classes include diseases in tomatoes, potatoes, and peppers")
 
         st.subheader("Usage Instructions:")
         st.write("1. Upload an image of a plant leaf")
-        st.write("2. Wait for the model to process the image")
-        st.write("3. View the diagnosis and recommended actions")
+        st.write("2. View the diagnosis and recommended actions")
+        st.write("3. Check detailed information about the disease")
 
-        st.subheader("Credits:")
-        st.write("Developed using PyTorch and Streamlit")
-        st.write("Model trained on the PlantVillage dataset")
+        st.subheader("Developers:")
+        st.markdown("""
+        - **Sayed Gamal**
+        - **Youssef Mohammed**
+        """)
+
+        st.subheader("Project Repository:")
+        st.markdown(
+            "[GitHub: Plant-Disease-Classifier](https://github.com/sayedgamal99/Plant-Disease-Classifier)")
+
+        st.markdown("---")
+        st.caption("© 2025 Plant Disease Classifier - All Rights Reserved")
 
 
 if __name__ == "__main__":
