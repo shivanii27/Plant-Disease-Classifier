@@ -19,6 +19,83 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Custom CSS for better styling
+st.markdown("""
+<style>
+    .main-header {
+        font-size: 2.5rem;
+        color: #2E7D32;
+        text-align: center;
+        margin-bottom: 1rem;
+    }
+    .sub-header {
+        font-size: 1.8rem;
+        color: #43A047;
+        margin-top: 1rem;
+        margin-bottom: 0.5rem;
+    }
+    .info-text {
+        font-size: 1.1rem;
+        color: #555;
+        margin-bottom: 1.5rem;
+    }
+    .prediction-header {
+        font-size: 2rem;
+        color: #2E7D32;
+        margin-top: 0.5rem;
+    }
+    .confidence-text {
+        font-size: 1.3rem;
+        color: #555;
+        margin-bottom: 1rem;
+    }
+    .section-divider {
+        margin-top: 2rem;
+        margin-bottom: 2rem;
+        border-top: 1px solid #ddd;
+    }
+    .disease-info-header {
+        font-size: 1.5rem;
+        color: #2E7D32;
+        margin-top: 1rem;
+        margin-bottom: 0.5rem;
+    }
+    .disease-info-subheader {
+        font-size: 1.2rem;
+        font-weight: bold;
+        color: #43A047;
+        margin-top: 1rem;
+        margin-bottom: 0.3rem;
+    }
+    .chart-container {
+        background-color: #f9f9f9;
+        padding: 1rem;
+        border-radius: 10px;
+        border: 1px solid #ddd;
+        margin-bottom: 1.5rem;
+    }
+    .example-btn {
+        margin: 0.2rem;
+    }
+    .stTable {
+        border: 1px solid #ddd;
+        border-radius: 5px;
+    }
+    .upload-section {
+        background-color: #f5f5f5;
+        padding: 1.5rem;
+        border-radius: 10px;
+        border: 1px solid #ddd;
+    }
+    .results-section {
+        background-color: #f5f5f5;
+        padding: 1.5rem;
+        border-radius: 10px;
+        border: 1px solid #ddd;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # Function to load model and necessary files
 
 
@@ -81,19 +158,24 @@ def predict(image_file, model, transform, label_encoder, device):
     # Return both original and formatted class names
     return class_name, formatted_primary_class, confidence, top_classes, formatted_top_classes, top_probabilities
 
+# Function to format class names for display
 
-# Function to display the prediction
+
+def format_class_name(name):
+    return name.replace("_", " ").title().replace("  ", " ").replace("  ", " ")
+
+# Function to display improved visualization of the prediction
+
 
 def display_prediction(original_class, formatted_class, confidence, top_classes, formatted_top_classes, top_probabilities):
-    # Display prediction
-    st.subheader("Prediction:")
+    # Main prediction header
     st.markdown(
-        f"<h3 style='color: #4CAF50;'>Diagnosis: {formatted_class}</h3>", unsafe_allow_html=True)
+        f"<h2 class='prediction-header'>Diagnosis: {formatted_class}</h2>", unsafe_allow_html=True)
     st.markdown(
-        f"<h4>Confidence: {confidence:.2f}%</h4>", unsafe_allow_html=True)
+        f"<p class='confidence-text'>Confidence: {confidence:.2f}%</p>", unsafe_allow_html=True)
 
-    # Display top 5 predictions
-    st.subheader("Top 5 Predictions:")
+    # Create a container for the chart
+    st.markdown("<div class='chart-container'>", unsafe_allow_html=True)
 
     # Create DataFrame for top predictions
     prediction_df = pd.DataFrame({
@@ -101,28 +183,57 @@ def display_prediction(original_class, formatted_class, confidence, top_classes,
         "Confidence": top_probabilities
     })
 
-    # Display as a bar chart
-    fig, ax = plt.subplots(figsize=(10, 5))
-    bars = ax.barh(prediction_df["Disease"],
-                   prediction_df["Confidence"], color='green')
-    ax.set_xlabel("Confidence (%)")
-    ax.set_ylabel("Disease")
-    ax.set_title("Top 5 Predictions")
+    # Create improved bar chart with better styling
+    fig, ax = plt.subplots(figsize=(12, 6))
 
-    # Add percentage labels
+    # Custom color palette - green gradient
+    colors = plt.cm.Greens(np.linspace(0.6, 0.95, len(prediction_df)))
+
+    bars = ax.barh(prediction_df["Disease"],
+                   prediction_df["Confidence"], color=colors)
+
+    # Improve chart appearance
+    ax.set_xlabel("Confidence (%)", fontsize=12, fontweight='bold')
+    ax.set_ylabel("Disease", fontsize=12, fontweight='bold')
+    ax.set_title("Top 5 Predictions", fontsize=16, fontweight='bold', pad=20)
+
+    # Add grid lines for better readability
+    ax.grid(axis='x', linestyle='--', alpha=0.7)
+
+    # Remove top and right spines
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+
+    # Customize tick labels
+    plt.xticks(fontsize=10)
+    plt.yticks(fontsize=11)
+
+    # Add percentage labels with better formatting
     for i, bar in enumerate(bars):
         ax.text(bar.get_width() + 1, bar.get_y() + bar.get_height()/2,
                 f"{prediction_df['Confidence'][i]:.2f}%",
-                va='center')
+                va='center', fontsize=10, fontweight='bold')
 
+    # Set background color
+    fig.patch.set_facecolor('#f9f9f9')
+    ax.set_facecolor('#f9f9f9')
+
+    # Tight layout
+    plt.tight_layout()
+
+    # Display the chart
     st.pyplot(fig)
+    st.markdown("</div>", unsafe_allow_html=True)
 
-    # Display as a table
-    st.table(prediction_df.style.format({"Confidence": "{:.2f}%"}))
+    # Create a clean table view of the predictions
+    st.markdown("<h3 class='sub-header'>Detailed Predictions:</h3>",
+                unsafe_allow_html=True)
+    styled_df = prediction_df.style.format(
+        {"Confidence": "{:.2f}%"}).background_gradient(cmap='Greens', subset=['Confidence'])
+    st.table(styled_df)
 
+# Function to display disease information
 
-def format_class_name(name):
-    return name.replace("_", " ").title().replace("  ", " ").replace("  ", " ")
 
 def display_disease_info(class_name, class_names):
     disease_info = {
@@ -219,20 +330,33 @@ def display_disease_info(class_name, class_names):
     }
 
     if class_name in disease_info:
-        st.subheader("Disease Information:")
+        st.markdown("<div class='section-divider'></div>",
+                    unsafe_allow_html=True)
+        st.markdown(
+            "<h3 class='disease-info-header'>Disease Information</h3>", unsafe_allow_html=True)
+
         info = disease_info[class_name]
 
-        st.markdown("#### Description")
-        st.write(info["description"])
+        # Create two columns for the disease information
+        col1, col2 = st.columns(2)
 
-        st.markdown("#### Causes")
-        st.write(info["causes"])
+        with col1:
+            st.markdown(
+                "<h4 class='disease-info-subheader'>Description</h4>", unsafe_allow_html=True)
+            st.write(info["description"])
 
-        st.markdown("#### Treatment")
-        st.write(info["treatment"])
+            st.markdown(
+                "<h4 class='disease-info-subheader'>Causes</h4>", unsafe_allow_html=True)
+            st.write(info["causes"])
 
-        st.markdown("#### Prevention")
-        st.write(info["prevention"])
+        with col2:
+            st.markdown(
+                "<h4 class='disease-info-subheader'>Treatment</h4>", unsafe_allow_html=True)
+            st.write(info["treatment"])
+
+            st.markdown(
+                "<h4 class='disease-info-subheader'>Prevention</h4>", unsafe_allow_html=True)
+            st.write(info["prevention"])
     else:
         st.info("Detailed information for this specific plant condition is not available. Please consult with an agricultural expert.")
 
@@ -246,107 +370,157 @@ def main():
         model_loaded = False
 
     # App title and header
-    st.title("🌿 Plant Disease Classifier")
-    st.markdown("""
-    This application uses deep learning to diagnose diseases in plant leaves. 
-    Simply upload an image of a plant leaf, and the model will predict if it's healthy or identify the disease.
-    """)
+    st.markdown("<h1 class='main-header'>🌿 Plant Disease Classifier</h1>",
+                unsafe_allow_html=True)
+    st.markdown("<p class='info-text'>This application uses deep learning to diagnose diseases in plant leaves. Simply upload an image of a plant leaf, and the model will predict if it's healthy or identify the disease.</p>", unsafe_allow_html=True)
 
-    # Create two columns for layout
+    # Create two columns for upload and image display
     col1, col2 = st.columns([1, 1])
 
+    # Store uploaded file in a session state
+    if 'uploaded_file' not in st.session_state:
+        st.session_state.uploaded_file = None
+    if 'image_processed' not in st.session_state:
+        st.session_state.image_processed = False
+    if 'prediction_results' not in st.session_state:
+        st.session_state.prediction_results = None
+
     with col1:
-        st.subheader("Upload Image")
+        st.markdown("<div class='upload-section'>", unsafe_allow_html=True)
+        st.markdown("<h3 class='sub-header'>Upload Image</h3>",
+                    unsafe_allow_html=True)
+
         # File uploader
         uploaded_file = st.file_uploader(
             "Choose an image...", type=["jpg", "jpeg", "png"])
 
-        # Example images
-        st.subheader("Or try an example:")
-        example_container = st.container()
-        with example_container:
-            example_col1, example_col2, example_col3 = st.columns(3)
+        if uploaded_file is not None:
+            st.session_state.uploaded_file = uploaded_file
 
-            if example_col1.button("Healthy Tomato"):
-                uploaded_file = "images/examples/tomato_healthy.jpg"
-            if example_col2.button("Potato Late blight"):
-                uploaded_file = "images/examples/Potato_Late_blight.jpeg"
-            if example_col3.button("Pepper bell Bacterial spot"):
-                uploaded_file = "images/examples/Pepper_bell_Bacterial_spot.jpeg"
+        # Example images section with better layout
+        st.markdown("<h3 class='sub-header'>Or try an example:</h3>",
+                    unsafe_allow_html=True)
 
-        # Display available classes
+        # Use columns for better button layout
+        example_col1, example_col2, example_col3 = st.columns(3)
+
+        if example_col1.button("Healthy Tomato", key="example1", use_container_width=True):
+            st.session_state.uploaded_file = "images/examples/tomato_healthy.jpg"
+
+        if example_col2.button("Potato Late Blight", key="example2", use_container_width=True):
+            st.session_state.uploaded_file = "images/examples/Potato_Late_blight.jpeg"
+
+        if example_col3.button("Pepper Bacterial Spot", key="example3", use_container_width=True):
+            st.session_state.uploaded_file = "images/examples/Pepper_bell_Bacterial_spot.jpeg"
+
+        # Display available classes in an expander
         with st.expander("Available Plant Diseases for Classification"):
-            # Format class names for display (replace underscores with spaces)
-            formatted_classes = [name.replace(
-                "_", " ").replace("__", " ").replace("___", " ") for name in class_names]
-            # Display in multiple columns for better use of space
-            columns = st.columns(3)
-            for i, class_name in enumerate(formatted_classes):
-                columns[i % 3].markdown(f"- {class_name}")
+            # Format class names for display
+            formatted_classes = [name.replace("_", " ").replace(
+                "__", " ").replace("___", " ").title() for name in class_names]
+
+            # Create a clean table for the class names
+            classes_df = pd.DataFrame(
+                {"Available Diseases": formatted_classes})
+            st.table(classes_df)
+
+        st.markdown("</div>", unsafe_allow_html=True)
 
     with col2:
-        st.subheader("Results")
-        # Display the uploaded image and prediction results
-        if uploaded_file is not None:
-            # If it's a string, it's an example image path
-            if isinstance(uploaded_file, str):
-                image = Image.open(uploaded_file)
-                st.image(image, caption="Uploaded Image",
+        st.markdown("<div class='results-section'>", unsafe_allow_html=True)
+        st.markdown("<h3 class='sub-header'>Image Preview</h3>",
+                    unsafe_allow_html=True)
+
+        # Display the uploaded image with better styling
+        if st.session_state.uploaded_file is not None:
+            # Handle both string paths (example images) and uploaded file objects
+            if isinstance(st.session_state.uploaded_file, str):
+                image = Image.open(st.session_state.uploaded_file)
+                st.image(image, caption="Selected Image",
                          use_container_width=True)
-                with open(uploaded_file, "rb") as f:
+
+                # Process the file for prediction
+                with open(st.session_state.uploaded_file, "rb") as f:
                     file_content = f.read()
                     uploaded_file_obj = type('obj', (object,), {
                         'getvalue': lambda: file_content
                     })
-                class_name, formatted_class, confidence, top_classes, formatted_top_classes, top_probabilities = predict(
+
+                # Make prediction
+                st.session_state.prediction_results = predict(
                     uploaded_file_obj, model, transform, label_encoder, device
                 )
+                st.session_state.image_processed = True
+
             else:
-                image = Image.open(uploaded_file)
+                # Handle normal uploaded file
+                image = Image.open(st.session_state.uploaded_file)
                 st.image(image, caption="Uploaded Image",
                          use_container_width=True)
-                class_name, formatted_class, confidence, top_classes, formatted_top_classes, top_probabilities = predict(
-                    uploaded_file_obj, model, transform, label_encoder, device
+
+                # Make prediction
+                st.session_state.prediction_results = predict(
+                    st.session_state.uploaded_file, model, transform, label_encoder, device
                 )
+                st.session_state.image_processed = True
+        else:
+            # Placeholder when no image is uploaded
+            st.info(
+                "Please upload an image or select an example to see the preview and diagnosis.")
 
-            display_prediction(class_name, formatted_class, confidence,
-                               top_classes, formatted_top_classes, top_probabilities)
+        st.markdown("</div>", unsafe_allow_html=True)
 
+    # Prediction section that spans the full width
+    if st.session_state.image_processed and st.session_state.prediction_results is not None:
+        st.markdown("<div class='section-divider'></div>",
+                    unsafe_allow_html=True)
 
-            display_disease_info(class_name, class_names)
+        # Unpack prediction results
+        class_name, formatted_class, confidence, top_classes, formatted_top_classes, top_probabilities = st.session_state.prediction_results
 
-    # Show model information
+        # Display prediction with improved visualization
+        display_prediction(class_name, formatted_class, confidence,
+                           top_classes, formatted_top_classes, top_probabilities)
+
+        # Display disease information
+        display_disease_info(class_name, class_names)
+
+    # Show model information in sidebar
     with st.sidebar:
-        st.header("About the Model")
+        st.markdown("<h2 style='color: #2E7D32;'>About the Model</h2>",
+                    unsafe_allow_html=True)
         st.write(
             "This application uses a Convolutional Neural Network (CNN) to classify plant diseases from leaf images.")
 
-        st.subheader("Model Architecture:")
+        st.markdown(
+            "<h3 style='color: #43A047; margin-top: 20px;'>Model Architecture:</h3>", unsafe_allow_html=True)
         if model_loaded:
-            st.write("- **Model Type:** CNN with 5 convolutional blocks with advanced architectures")
+            st.write(
+                "- **Model Type:** CNN with 5 convolutional blocks with advanced architectures")
             st.write(f"- **Number of Classes:** {len(class_names)}")
-
-
-            # Add model performance metrics
             st.write("- **Test Accuracy:** 96.5%")
-            
-        st.subheader("Dataset Information:")
+
+        st.markdown(
+            "<h3 style='color: #43A047; margin-top: 20px;'>Dataset Information:</h3>", unsafe_allow_html=True)
         st.write("- Trained on the PlantVillage dataset")
         st.write("- Contains 15 classes of plant diseases and healthy plants")
         st.write("- Classes include diseases in tomatoes, potatoes, and peppers")
 
-        st.subheader("Usage Instructions:")
+        st.markdown(
+            "<h3 style='color: #43A047; margin-top: 20px;'>Usage Instructions:</h3>", unsafe_allow_html=True)
         st.write("1. Upload an image of a plant leaf")
         st.write("2. View the diagnosis and recommended actions")
         st.write("3. Check detailed information about the disease")
 
-        st.subheader("Developers:")
+        st.markdown(
+            "<h3 style='color: #43A047; margin-top: 20px;'>Developers:</h3>", unsafe_allow_html=True)
         st.markdown("""
         - **Sayed Gamal**
         - **Youssef Mohammed**
         """)
 
-        st.subheader("Project Repository:")
+        st.markdown(
+            "<h3 style='color: #43A047; margin-top: 20px;'>Project Repository:</h3>", unsafe_allow_html=True)
         st.markdown(
             "[GitHub: Plant-Disease-Classifier](https://github.com/sayedgamal99/Plant-Disease-Classifier)")
 
